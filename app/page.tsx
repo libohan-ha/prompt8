@@ -66,6 +66,7 @@ export default function Home() {
                   <SelectItem value="gemini-2.0-flash-exp">Gemini 2.0 Flash</SelectItem>
                   <SelectItem value="gpt4o">GPT-4o</SelectItem>
                   <SelectItem value="claude">Claude 3.5</SelectItem>
+                  <SelectItem value="grok">Grok</SelectItem>
                 </SelectContent>
               </Select>
               
