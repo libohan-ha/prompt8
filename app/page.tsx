@@ -64,6 +64,7 @@ export default function Home() {
                   <SelectItem value="deepseek-v3">DeepSeek V3</SelectItem>
                   <SelectItem value="gemini-1206">Gemini 1206</SelectItem>
                   <SelectItem value="gemini-2.0-flash-exp">Gemini 2.0 Flash</SelectItem>
+                  <SelectItem value="gpt4o">GPT-4o </SelectItem>
                 </SelectContent>
               </Select>
               

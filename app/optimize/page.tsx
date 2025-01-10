@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/components/ui/use-toast"
-import { callGemini, callGeminiFlash, GEMINI_API_KEY } from "@/lib/api"
+import { GEMINI_API_KEY } from "@/lib/api"
 import { getLocalStorage } from '@/lib/utils'
 import type { OptimizedPrompt, TestResult } from '@/types/prompt'
 import { ArrowRightIcon, CopyIcon, Loader2, Play, PlusCircle, Zap } from 'lucide-react'
@@ -102,96 +102,113 @@ export default function OptimizePage() {
 
   const startOptimize = async (originalPrompt: string) => {
     try {
-      const response = await fetch("/api/deepseek", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "deepseek-chat",
-          messages: [
-            {
-              role: "system",
-              content: `你是一个专业的AI提示词优化专家。请帮我优化以下prompt，并按照以下格式返回：
-
-# Role: [角色名称]
-
-## Profile
-- language: [语言]
-- description: [详细的角色描述]
-- background: [角色背景]
-- personality: [性格特征]
-- expertise: [专业领域]
-- target_audience: [目标用户群]
-
-## Skills
-
-1. [核心技能类别 1]
-   - [具体技能]: [简要说明]
-   - [具体技能]: [简要说明]
-   - [具体技能]: [简要说明]
-   - [具体技能]: [简要说明]
-
-2. [核心技能类别 2]
-   - [具体技能]: [简要说明]
-   - [具体技能]: [简要说明]
-   - [具体技能]: [简要说明]
-   - [具体技能]: [简要说明]
-
-3. [辅助技能类别]
-   - [具体技能]: [简要说明]
-   - [具体技能]: [简要说明]
-   - [具体技能]: [简要说明]
-   - [具体技能]: [简要说明]
-
-## Rules
-
-1. [基本原则]：
-   - [具体规则]: [详细说明]
-   - [具体规则]: [详细说明]
-   - [具体规则]: [详细说明]
-   - [具体规则]: [详细说明]
-
-2. [行为准则]：
-   - [具体规则]: [详细说明]
-   - [具体规则]: [详细说明]
-   - [具体规则]: [详细说明]
-   - [具体规则]: [详细说明]
-
-3. [限制条件]：
-   - [具体限制]: [详细说明]
-   - [具体限制]: [详细说明]
-   - [具体限制]: [详细说明]
-   - [具体限制]: [详细说明]
-
-## Workflows
-
-1. [主要工作流程 1]
-   - 目标: [明确目标]
-   - 步骤 1: [详细说明]
-   - 步骤 2: [详细说明]
-   - 步骤 3: [详细说明]
-   - 预期结果: [说明]
-
-2. [主要工作流程 2]
-   - 目标: [明确目标]
-   - 步骤 1: [详细说明]
-   - 步骤 2: [详细说明]
-   - 步骤 3: [详细说明]
-   - 预期结果: [说明]
-
-请基于以上模板，优化并扩展以下prompt，确保内容专业、完整且结构清晰：`
-            },
-            {
-              role: "user", 
-              content: originalPrompt
-            }
-          ],
-          stream: true,
-          temperature: 0.7,
-          max_tokens: 2000
+      const saved = getLocalStorage('optimizedPrompt')
+      const selectedModel = saved ? JSON.parse(saved).model : "deepseek-v3"
+      
+      let response: Response;
+      
+      if (selectedModel === "gpt4o") {
+        response = await fetch("/api/gpt4o", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "gpt-4",
+            messages: [
+              {
+                role: "system",
+                content: `你是一个专业的AI提示词优化专家。请帮我优化以下prompt...`
+              },
+              {
+                role: "user", 
+                content: originalPrompt
+              }
+            ],
+            stream: true,
+            temperature: 0.7,
+            max_tokens: 2000
+          })
         })
-      })
+      } else if (selectedModel === "gemini-1206" || selectedModel === "gemini-2.0-flash-exp") {
+        // 处理 Gemini 模型
+        const modelName = selectedModel === "gemini-1206" ? "gemini-exp-1206" : "gemini-2.0-flash-exp"
+        
+        response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${GEMINI_API_KEY}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              contents: [{
+                role: "user",
+                parts: [{ text: `Instructions: 你是一个专业的AI提示词优化专家。请帮我优化以下prompt...\n\nInput: ${originalPrompt}` }]
+              }],
+              generationConfig: selectedModel === "gemini-2.0-flash-exp" ? {
+                temperature: 0.9,
+                maxOutputTokens: 2048,
+              } : {
+                temperature: 1,
+                topK: 64,
+                topP: 0.95,
+                maxOutputTokens: 8192,
+              }
+            })
+          }
+        )
+
+        if (!response.ok) {
+          const error = await response.json()
+          throw new Error(error.error || '优化请求失败')
+        }
+
+        // 特别处理Gemini的响应
+        const result = await response.json()
+        if (result.candidates?.[0]?.content?.parts?.[0]?.text) {
+          const content = result.candidates[0].content.parts[0].text
+          setStreamContent(content)
+          
+          // 更新历史记录
+          const optimizedPrompt = {
+            content: content,
+            originalPrompt: originalPrompt,
+            version: promptHistory.length + 1
+          }
+          
+          const newHistory = [...promptHistory, optimizedPrompt]
+          setPromptHistory(newHistory)
+          setCurrentVersion(newHistory.length)
+          localStorage.setItem('optimizedPromptHistory', JSON.stringify(newHistory))
+          localStorage.setItem('optimizedPrompt', JSON.stringify(optimizedPrompt))
+        }
+        
+        return; // 提前返回，不执行后续的流处理逻辑
+      } else {
+        response = await fetch("/api/deepseek", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "deepseek-chat",
+            messages: [
+              {
+                role: "system",
+                content: `你是一个专业的AI提示词优化专家。请帮我优化以下prompt...`
+              },
+              {
+                role: "user", 
+                content: originalPrompt
+              }
+            ],
+            stream: true,
+            temperature: 0.7,
+            max_tokens: 2000
+          })
+        })
+      }
 
       if (!response.ok) {
         const error = await response.json()
@@ -324,7 +341,122 @@ export default function OptimizePage() {
       setIsLoading(true)
       setTestResult(null)
 
-      if (model === "deepseek-v3") {
+      if (model === "gpt4o") {
+        const response = await fetch("/api/gpt4o", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "gpt-4",
+            messages: [
+              {
+                role: "system",
+                content: editedContent
+              },
+              {
+                role: "user", 
+                content: testInput
+              }
+            ],
+            stream: true,
+            temperature: 0.7,
+            max_tokens: 2000
+          })
+        })
+
+        if (!response.ok) {
+          const error = await response.json()
+          throw new Error(error.error || '测试请求失败')
+        }
+
+        const reader = response.body?.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ""
+        let contentBuffer = ""
+        
+        while (reader) {
+          const { done, value } = await reader.read()
+          if (done) {
+            setTestResult({
+              input: testInput,
+              output: contentBuffer,
+              model: model
+            })
+            break
+          }
+
+          buffer += decoder.decode(value, { stream: true })
+          const chunks = buffer.split('\n')
+          buffer = chunks.pop() || ''
+
+          for (const chunk of chunks) {
+            if (chunk.startsWith('data: ')) {
+              const data = chunk.slice(6)
+              if (data === '[DONE]') break
+
+              try {
+                const json = JSON.parse(data)
+                const content = json.choices[0]?.delta?.content || ''
+                if (content) {
+                  contentBuffer += content
+                  setTestResult(prev => ({
+                    input: testInput,
+                    output: contentBuffer,
+                    model: model
+                  }))
+                }
+              } catch (e) {
+                console.error('Error parsing SSE message:', e)
+              }
+            }
+          }
+        }
+      } else if (model === "gemini-1206" || model === "gemini-2.0-flash-exp") {
+        const modelName = model === "gemini-1206" ? "gemini-exp-1206" : "gemini-2.0-flash-exp"
+        
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${GEMINI_API_KEY}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              contents: [{
+                role: "user",
+                parts: [{ text: `Instructions: ${editedContent}\n\nInput: ${testInput}` }]
+              }],
+              generationConfig: model === "gemini-2.0-flash-exp" ? {
+                temperature: 0.9,
+                maxOutputTokens: 2048,
+              } : {
+                temperature: 1,
+                topK: 64,
+                topP: 0.95,
+                maxOutputTokens: 8192,
+              }
+            })
+          }
+        )
+
+        if (!response.ok) {
+          const error = await response.json()
+          throw new Error(error.error || '测试请求失败')
+        }
+
+        const result = await response.json()
+        if (result.candidates?.[0]?.content?.parts?.[0]?.text) {
+          const content = result.candidates[0].content.parts[0].text
+          setTestResult({
+            input: testInput,
+            output: content,
+            model: model
+          })
+        }
+        
+        return; // 提前返回，不执行后续的流处理逻辑
+      } else if (model === "deepseek-v3") {
         const response = await fetch("/api/deepseek", {
           method: "POST",
           headers: {
@@ -395,74 +527,6 @@ export default function OptimizePage() {
             }
           }
         }
-      } else {
-        const response = await fetch(
-          model === "gemini-2.0-flash-exp" 
-            ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`
-            : `https://generativelanguage.googleapis.com/v1beta/models/gemini-exp-1206:generateContent?key=${GEMINI_API_KEY}`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              contents: [{
-                role: "user",
-                parts: [{ text: `Instructions: ${editedContent}\n\nInput: ${testInput}` }]
-              }],
-              generationConfig: model === "gemini-2.0-flash-exp" ? {
-                temperature: 0.9,
-                maxOutputTokens: 2048,
-              } : {
-                temperature: 1,
-                topK: 64,
-                topP: 0.95,
-                maxOutputTokens: 8192,
-              }
-            })
-          }
-        )
-
-        if (!response.ok) {
-          const error = await response.json()
-          console.error('Gemini API Error:', error)
-          throw new Error(error.error?.message || '测试请求失败')
-        }
-
-        const reader = response.body?.getReader()
-        const decoder = new TextDecoder()
-        let contentBuffer = ""
-
-        while (reader) {
-          try {
-            const { done, value } = await reader.read()
-            if (done) break
-
-            const chunk = decoder.decode(value)
-            try {
-              const data = JSON.parse(chunk)
-              if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
-                const text = data.candidates[0].content.parts[0].text
-                contentBuffer += text
-                setTestResult({
-                  input: testInput,
-                  output: contentBuffer,
-                  model: model
-                })
-              }
-            } catch (e) {
-              console.error('Error parsing JSON:', e)
-            }
-          } catch (e) {
-            console.error('Error reading stream:', e)
-          }
-        }
-
-        setTestResult({
-          input: testInput,
-          output: contentBuffer,
-          model: model
-        })
       }
     } catch (error) {
       console.error(error)
@@ -848,6 +912,7 @@ ${feedback}
                       <SelectItem value="deepseek-v3">DeepSeek V3</SelectItem>
                       <SelectItem value="gemini-1206">Gemini 1206</SelectItem>
                       <SelectItem value="gemini-2.0-flash-exp">Gemini 2.0 Flash</SelectItem>
+                      <SelectItem value="gpt4o">GPT-4o</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
