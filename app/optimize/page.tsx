@@ -1209,49 +1209,145 @@ Input: ${testInput}` }]
 
   const handleIterate = async (feedback: string) => {
     try {
+      // 关闭对话框
       setIsIterateDialogOpen(false)
       
       setIsIterating(true)
+      // 清空历史内容
       setStreamContent("")
       setTestResult(null)
       setTestInput("")
-
+      
+      // 滚动到优化结果区域
       const optimizedSection = document.querySelector('.optimized-prompt-section')
       optimizedSection?.scrollIntoView({ behavior: 'smooth' })
-
-      const response = await fetch("https://api.deepseek.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${process.env.NEXT_PUBLIC_DEEPSEEK_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: "deepseek-chat",
-          messages: [
-            {
-              role: "system",
-              content: `你是一个专业的AI提示词优化专家。请根据用户的要求优化以下prompt：
-
-当前prompt:
-${editedContent}
-
-用户的优化要求:
-${feedback}
-
-请基于用户的要求优化prompt，返回格式不变。`
-            },
-            {
-              role: "user",
-              content: "请根据以上要求优化prompt。"
-            }
-          ],
-          stream: true,
-          temperature: 0.7,
-          max_tokens: 2000
+      
+      let response: Response;
+      
+      // 获取当前选中的模型
+      const saved = getLocalStorage('optimizedPrompt')
+      const selectedModel = saved ? JSON.parse(saved).model : model
+      
+      if (selectedModel === "gpt4o") {
+        response = await fetch("/api/gpt4o", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "gpt-4o",
+            messages: [
+              {
+                role: "system",
+                content: editedContent
+              },
+              {
+                role: "user",
+                content: `请根据以下反馈优化prompt：${feedback}`
+              }
+            ],
+            stream: true,
+            temperature: 0.7,
+            max_tokens: 2000
+          })
         })
-      })
+      } else if (selectedModel === "gemini-1206" || selectedModel === "gemini-2.0-flash-exp") {
+        const modelName = selectedModel === "gemini-1206" ? "gemini-exp-1206" : "gemini-2.0-flash-exp"
+        response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${GEMINI_API_KEY}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              contents: [{
+                role: "user",
+                parts: [{ text: `Instructions: ${editedContent}\n\n请根据以下反馈优化prompt：${feedback}` }]
+              }],
+              generationConfig: selectedModel === "gemini-2.0-flash-exp" ? {
+                temperature: 0.9,
+                maxOutputTokens: 2048,
+              } : {
+                temperature: 1,
+                topK: 64,
+                topP: 0.95,
+                maxOutputTokens: 8192,
+              },
+              stream: true
+            })
+          }
+        )
+      } else if (selectedModel === "claude") {
+        response = await fetch("/api/claude", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "claude-3-5-sonnet-20241022",
+            messages: [
+              {
+                role: "system",
+                content: editedContent
+              },
+              {
+                role: "user",
+                content: `请根据以下反馈优化prompt：${feedback}`
+              }
+            ],
+            stream: true
+          })
+        })
+      } else if (selectedModel === "grok") {
+        response = await fetch("/api/grok", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "grok-beta",
+            messages: [
+              {
+                role: "system",
+                content: editedContent
+              },
+              {
+                role: "user",
+                content: `请根据以下反馈优化prompt：${feedback}`
+              }
+            ],
+            stream: true
+          })
+        })
+      } else {
+        // DeepSeek 模型
+        response = await fetch("/api/deepseek", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "deepseek-chat",
+            messages: [
+              {
+                role: "system",
+                content: editedContent
+              },
+              {
+                role: "user",
+                content: `请根据以下反馈优化prompt：${feedback}`
+              }
+            ],
+            stream: true
+          })
+        })
+      }
 
-      if (!response.ok) throw new Error('迭代请求失败')
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || '迭代请求失败')
+      }
 
       const reader = response.body?.getReader()
       const decoder = new TextDecoder()
