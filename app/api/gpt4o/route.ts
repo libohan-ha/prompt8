@@ -6,13 +6,17 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     
-    const response = await fetch("https://all.302.ai/v1/chat/completions", {
+    const response = await fetch("https://api.302.ai/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${process.env.GPT4O_API_KEY}`
       },
-      body: JSON.stringify(body)
+      body: JSON.stringify({
+        model: "gpt-4o",
+        messages: body.messages,
+        stream: true
+      })
     })
 
     // Handle non-OK responses
