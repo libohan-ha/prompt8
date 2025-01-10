@@ -57,15 +57,15 @@ export default function Home() {
             />
             
             <div className="flex justify-between items-center gap-4">
-              <Button
-                variant="outline"
-                className="h-12 sm:h-16 px-6 sm:px-8 text-base sm:text-lg rounded-xl sm:rounded-2xl bg-white hover:bg-purple-50 text-purple-600 border-purple-200 hover:border-purple-400 flex items-center justify-center space-x-3 transition-all duration-300 ease-in-out transform hover:scale-105"
-                onClick={() => setIsDonateDialogOpen(true)}
-              >
-                <span>捐赠</span>
-              </Button>
-              <div className="flex items-center gap-4">
-                <Select defaultValue="deepseek-v3" onValueChange={setModel}>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <Button
+                  variant="outline"
+                  className="h-12 sm:h-16 px-6 sm:px-8 text-base sm:text-lg rounded-xl sm:rounded-2xl bg-white hover:bg-purple-50 text-purple-600 border-purple-200 hover:border-purple-400 flex items-center justify-center space-x-3 transition-all duration-300 ease-in-out transform hover:scale-105"
+                  onClick={() => setIsDonateDialogOpen(true)}
+                >
+                  <span>捐赠</span>
+                </Button>
+                <Select value={model} onValueChange={setModel}>
                   <SelectTrigger className="w-[200px] h-12 sm:h-16 text-base sm:text-lg bg-white border-orange-200 text-orange-600 rounded-xl sm:rounded-2xl">
                     <Zap className="w-5 h-5 sm:w-6 sm:h-6 mr-2" />
                     <SelectValue />
@@ -79,10 +79,10 @@ export default function Home() {
                     <SelectItem value="grok">Grok</SelectItem>
                   </SelectContent>
                 </Select>
-                
                 <Button
-                  className="h-12 sm:h-16 px-6 sm:px-8 text-base sm:text-lg rounded-xl sm:rounded-2xl bg-gradient-to-r from-blue-600 to-green-600 text-white hover:from-blue-700 hover:to-green-700 transition-all duration-300 ease-in-out transform hover:scale-105"
+                  className="h-12 sm:h-16 px-6 sm:px-8 text-base sm:text-lg rounded-xl sm:rounded-2xl bg-gradient-to-r from-blue-500 to-green-500 hover:from-blue-600 hover:to-green-600 text-white flex items-center justify-center space-x-3 transition-all duration-300 ease-in-out transform hover:scale-105"
                   onClick={handleOptimize}
+                  disabled={!prompt.trim()}
                 >
                   <span className="mr-2">开始优化</span><span>→</span>
                 </Button>
