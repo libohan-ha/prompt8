@@ -17,6 +17,7 @@ import type { OptimizedPrompt, TestResult } from '@/types/prompt'
 import { ArrowRightIcon, CopyIcon, Loader2, Play, PlusCircle, Zap } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { DonateDialog } from "../../components/donate-dialog"
 
 export default function OptimizePage() {
   const router = useRouter()
@@ -35,6 +36,7 @@ export default function OptimizePage() {
   const [currentPage, setCurrentPage] = useState(1)
   const VISIBLE_VERSIONS = 3 // 一次显示3个版本
   const [startVersion, setStartVersion] = useState(1)
+  const [isDonateDialogOpen, setIsDonateDialogOpen] = useState(false)
 
   // 计算总页数
   const totalPages = Math.ceil(promptHistory.length / VERSIONS_PER_PAGE)
@@ -1332,14 +1334,23 @@ ${feedback}
                   />
                 </div>
                 <div className="mt-4 flex justify-end">
-                  <Button
-                    variant="outline"
-                    className="h-12 sm:h-16 px-6 sm:px-8 text-base sm:text-lg rounded-xl sm:rounded-2xl bg-white hover:bg-green-50 text-green-600 border-green-200 hover:border-green-400 flex items-center justify-center space-x-3 transition-all duration-300 ease-in-out transform hover:scale-105"
-                    onClick={handleNewProject}
-                  >
-                    <PlusCircle className="w-5 h-5 sm:w-6 sm:h-6" />
-                    <span>新建项目</span>
-                  </Button>
+                  <div className="flex justify-between w-full items-center">
+                    <Button
+                      variant="outline"
+                      className="h-12 sm:h-16 px-6 sm:px-8 text-base sm:text-lg rounded-xl sm:rounded-2xl bg-white hover:bg-purple-50 text-purple-600 border-purple-200 hover:border-purple-400 flex items-center justify-center space-x-3 transition-all duration-300 ease-in-out transform hover:scale-105"
+                      onClick={() => setIsDonateDialogOpen(true)}
+                    >
+                      <span>捐赠</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="h-12 sm:h-16 px-6 sm:px-8 text-base sm:text-lg rounded-xl sm:rounded-2xl bg-white hover:bg-green-50 text-green-600 border-green-200 hover:border-green-400 flex items-center justify-center space-x-3 transition-all duration-300 ease-in-out transform hover:scale-105"
+                      onClick={handleNewProject}
+                    >
+                      <PlusCircle className="w-5 h-5 sm:w-6 sm:h-6" />
+                      <span>新建项目</span>
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1352,6 +1363,10 @@ ${feedback}
         onOpenChange={setIsIterateDialogOpen}
         onConfirm={handleIterate}
         isLoading={isIterating}
+      />
+      <DonateDialog 
+        open={isDonateDialogOpen} 
+        onOpenChange={setIsDonateDialogOpen}
       />
     </>
   )
