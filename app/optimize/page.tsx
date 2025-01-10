@@ -253,6 +253,95 @@ export default function OptimizePage() {
         }
         
         return; // 提前返回，不执行后续的流处理逻辑
+      } else if (selectedModel === "claude") {
+        response = await fetch("/api/claude", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "claude-3-5-sonnet-20241022",
+            messages: [
+              {
+                role: "system",
+                content: `你是一个专业的AI提示词优化专家。请帮我优化以下prompt，并按照以下格式返回：
+
+# Role: [角色名称]
+
+## Profile
+- language: [语言]
+- description: [详细的角色描述]
+- background: [角色背景]
+- personality: [性格特征]
+- expertise: [专业领域]
+- target_audience: [目标用户群]
+
+## Skills
+
+1. [核心技能类别 1]
+   - [具体技能]: [简要说明]
+   - [具体技能]: [简要说明]
+   - [具体技能]: [简要说明]
+   - [具体技能]: [简要说明]
+
+2. [核心技能类别 2]
+   - [具体技能]: [简要说明]
+   - [具体技能]: [简要说明]
+   - [具体技能]: [简要说明]
+   - [具体技能]: [简要说明]
+
+3. [辅助技能类别]
+   - [具体技能]: [简要说明]
+   - [具体技能]: [简要说明]
+   - [具体技能]: [简要说明]
+   - [具体技能]: [简要说明]
+
+## Rules
+
+1. [基本原则]：
+   - [具体规则]: [详细说明]
+   - [具体规则]: [详细说明]
+   - [具体规则]: [详细说明]
+   - [具体规则]: [详细说明]
+
+2. [行为准则]：
+   - [具体规则]: [详细说明]
+   - [具体规则]: [详细说明]
+   - [具体规则]: [详细说明]
+   - [具体规则]: [详细说明]
+
+3. [限制条件]：
+   - [具体限制]: [详细说明]
+   - [具体限制]: [详细说明]
+   - [具体限制]: [详细说明]
+   - [具体限制]: [详细说明]
+
+## Workflows
+
+1. [主要工作流程 1]
+   - 目标: [明确目标]
+   - 步骤 1: [详细说明]
+   - 步骤 2: [详细说明]
+   - 步骤 3: [详细说明]
+   - 预期结果: [说明]
+
+2. [主要工作流程 2]
+   - 目标: [明确目标]
+   - 步骤 1: [详细说明]
+   - 步骤 2: [详细说明]
+   - 步骤 3: [详细说明]
+   - 预期结果: [说明]
+
+请基于以上模板，优化并扩展以下prompt，确保内容专业、完整且结构清晰：`
+              },
+              {
+                role: "user", 
+                content: originalPrompt
+              }
+            ],
+            stream: true
+          })
+        })
       } else {
         response = await fetch("/api/deepseek", {
           method: "POST",
@@ -386,8 +475,8 @@ export default function OptimizePage() {
       const optimizedPrompt = {
         content: finalContent,
         originalPrompt: originalPrompt,
-    version: 1
-  }
+        version: 1
+      }
 
       setPromptHistory([optimizedPrompt])
       localStorage.setItem('optimizedPrompt', JSON.stringify(optimizedPrompt))
@@ -594,6 +683,84 @@ export default function OptimizePage() {
               }
             }
           }
+        }
+      } else if (model === "claude") {
+        try {
+          const response = await fetch("/api/claude", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: "claude-3-5-sonnet-20241022",
+              messages: [
+                {
+                  role: "system",
+                  content: editedContent
+                },
+                {
+                  role: "user", 
+                  content: testInput
+                }
+              ],
+              stream: true
+            })
+          })
+
+          if (!response.ok) {
+            const error = await response.json()
+            throw new Error(error.error || '测试请求失败')
+          }
+
+          const reader = response.body?.getReader()
+          const decoder = new TextDecoder()
+          let buffer = ""
+          let contentBuffer = ""
+          
+          while (reader) {
+            const { done, value } = await reader.read()
+            if (done) {
+              setTestResult({
+                input: testInput,
+                output: contentBuffer,
+                model: model
+              })
+              break
+            }
+
+            buffer += decoder.decode(value, { stream: true })
+            const chunks = buffer.split('\n')
+            buffer = chunks.pop() || ''
+
+            for (const chunk of chunks) {
+              if (chunk.startsWith('data: ')) {
+                const data = chunk.slice(6)
+                if (data === '[DONE]') break
+
+                try {
+                  const json = JSON.parse(data)
+                  const content = json.choices[0]?.delta?.content || ''
+                  if (content) {
+                    contentBuffer += content
+                    setTestResult(prev => ({
+                      input: testInput,
+                      output: contentBuffer,
+                      model: model
+                    }))
+                  }
+                } catch (e) {
+                  console.error('Error parsing SSE message:', e)
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error(error)
+          toast({
+            variant: "destructive",
+            title: "测试失败",
+            description: error instanceof Error ? error.message : "未知错误"
+          })
         }
       }
     } catch (error) {
@@ -806,14 +973,12 @@ ${feedback}
       const newPrompt = {
         content: fullContent,
         originalPrompt: editedContent,
-        version: newVersion,
-        feedback: feedback
+        version: newVersion
       }
 
       const newHistory = [...promptHistory, newPrompt]
       setPromptHistory(newHistory)
       setCurrentVersion(newVersion)
-      // 自动滚动到最新版本
       setStartVersion(Math.max(1, newVersion - VISIBLE_VERSIONS + 1))
       
       localStorage.setItem('optimizedPrompt', JSON.stringify(newPrompt))
@@ -981,6 +1146,7 @@ ${feedback}
                       <SelectItem value="gemini-1206">Gemini 1206</SelectItem>
                       <SelectItem value="gemini-2.0-flash-exp">Gemini 2.0 Flash</SelectItem>
                       <SelectItem value="gpt4o">GPT-4o</SelectItem>
+                      <SelectItem value="claude">Claude 3.5</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
