@@ -214,7 +214,77 @@ export default function OptimizePage() {
             body: JSON.stringify({
               contents: [{
                 role: "user",
-                parts: [{ text: `Instructions: 你是一个专业的AI提示词优化专家。请帮我优化以下prompt...\n\nInput: ${originalPrompt}` }]
+                parts: [{ text: `Instructions: 你是一个专业的AI提示词优化专家。请帮我优化以下prompt，并按照以下格式返回：
+
+# Role: [角色名称]
+
+## Profile
+- language: [语言]
+- description: [详细的角色描述]
+- background: [角色背景]
+- personality: [性格特征]
+- expertise: [专业领域]
+- target_audience: [目标用户群]
+
+## Skills
+
+1. [核心技能类别 1]
+   - [具体技能]: [简要说明]
+   - [具体技能]: [简要说明]
+   - [具体技能]: [简要说明]
+   - [具体技能]: [简要说明]
+
+2. [核心技能类别 2]
+   - [具体技能]: [简要说明]
+   - [具体技能]: [简要说明]
+   - [具体技能]: [简要说明]
+   - [具体技能]: [简要说明]
+
+3. [辅助技能类别]
+   - [具体技能]: [简要说明]
+   - [具体技能]: [简要说明]
+   - [具体技能]: [简要说明]
+   - [具体技能]: [简要说明]
+
+## Rules
+
+1. [基本原则]：
+   - [具体规则]: [详细说明]
+   - [具体规则]: [详细说明]
+   - [具体规则]: [详细说明]
+   - [具体规则]: [详细说明]
+
+2. [行为准则]：
+   - [具体规则]: [详细说明]
+   - [具体规则]: [详细说明]
+   - [具体规则]: [详细说明]
+   - [具体规则]: [详细说明]
+
+3. [限制条件]：
+   - [具体限制]: [详细说明]
+   - [具体限制]: [详细说明]
+   - [具体限制]: [详细说明]
+   - [具体限制]: [详细说明]
+
+## Workflows
+
+1. [主要工作流程 1]
+   - 目标: [明确目标]
+   - 步骤 1: [详细说明]
+   - 步骤 2: [详细说明]
+   - 步骤 3: [详细说明]
+   - 预期结果: [说明]
+
+2. [主要工作流程 2]
+   - 目标: [明确目标]
+   - 步骤 1: [详细说明]
+   - 步骤 2: [详细说明]
+   - 步骤 3: [详细说明]
+   - 预期结果: [说明]
+
+请基于以上模板，优化并扩展以下prompt，确保内容专业、完整且结构清晰：
+
+Input: ${originalPrompt}` }]
               }],
               generationConfig: selectedModel === "gemini-2.0-flash-exp" ? {
                 temperature: 0.9,
@@ -588,15 +658,6 @@ export default function OptimizePage() {
     try {
       setIsLoading(true)
       setTestResult(null)
-      let contentBuffer = ""
-      const updateTestResult = (content: string) => {
-        contentBuffer += content
-        setTestResult({
-          input: testInput,
-          output: contentBuffer,
-          model: model
-        })
-      }
 
       if (model === "gpt4o") {
         const response = await fetch("/api/gpt4o", {
@@ -630,10 +691,16 @@ export default function OptimizePage() {
         const reader = response.body?.getReader()
         const decoder = new TextDecoder()
         let buffer = ""
+        let contentBuffer = ""
         
         while (reader) {
           const { done, value } = await reader.read()
           if (done) {
+            setTestResult({
+              input: testInput,
+              output: contentBuffer,
+              model: model
+            })
             break
           }
 
@@ -650,7 +717,12 @@ export default function OptimizePage() {
                 const json = JSON.parse(data)
                 const content = json.choices[0]?.delta?.content || ''
                 if (content) {
-                  updateTestResult(content)
+                  contentBuffer += content
+                  setTestResult(prev => ({
+                    input: testInput,
+                    output: contentBuffer,
+                    model: model
+                  }))
                 }
               } catch (e) {
                 console.error('Error parsing SSE message:', e)
@@ -694,7 +766,11 @@ export default function OptimizePage() {
         const result = await response.json()
         if (result.candidates?.[0]?.content?.parts?.[0]?.text) {
           const content = result.candidates[0].content.parts[0].text
-          updateTestResult(content)
+          setTestResult({
+            input: testInput,
+            output: content,
+            model: model
+          })
         }
         
         return; // 提前返回，不执行后续的流处理逻辑
@@ -730,10 +806,16 @@ export default function OptimizePage() {
         const reader = response.body?.getReader()
         const decoder = new TextDecoder()
         let buffer = ""
+        let contentBuffer = ""
         
         while (reader) {
           const { done, value } = await reader.read()
           if (done) {
+            setTestResult({
+              input: testInput,
+              output: contentBuffer,
+              model: model
+            })
             break
           }
 
@@ -750,7 +832,12 @@ export default function OptimizePage() {
                 const json = JSON.parse(data)
                 const content = json.choices[0]?.delta?.content || ''
                 if (content) {
-                  updateTestResult(content)
+                  contentBuffer += content
+                  setTestResult(prev => ({
+                    input: testInput,
+                    output: contentBuffer,
+                    model: model
+                  }))
                 }
               } catch (e) {
                 console.error('Error parsing SSE message:', e)
@@ -789,10 +876,16 @@ export default function OptimizePage() {
           const reader = response.body?.getReader()
           const decoder = new TextDecoder()
           let buffer = ""
+          let contentBuffer = ""
           
           while (reader) {
             const { done, value } = await reader.read()
             if (done) {
+              setTestResult({
+                input: testInput,
+                output: contentBuffer,
+                model: model
+              })
               break
             }
 
@@ -809,7 +902,12 @@ export default function OptimizePage() {
                   const json = JSON.parse(data)
                   const content = json.choices[0]?.delta?.content || ''
                   if (content) {
-                    updateTestResult(content)
+                    contentBuffer += content
+                    setTestResult(prev => ({
+                      input: testInput,
+                      output: contentBuffer,
+                      model: model
+                    }))
                   }
                 } catch (e) {
                   console.error('Error parsing SSE message:', e)
@@ -856,10 +954,16 @@ export default function OptimizePage() {
           const reader = response.body?.getReader()
           const decoder = new TextDecoder()
           let buffer = ""
+          let contentBuffer = ""
           
           while (reader) {
             const { done, value } = await reader.read()
             if (done) {
+              setTestResult({
+                input: testInput,
+                output: contentBuffer,
+                model: model
+              })
               break
             }
 
@@ -876,7 +980,12 @@ export default function OptimizePage() {
                   const json = JSON.parse(data)
                   const content = json.choices[0]?.delta?.content || ''
                   if (content) {
-                    updateTestResult(content)
+                    contentBuffer += content
+                    setTestResult(prev => ({
+                      input: testInput,
+                      output: contentBuffer,
+                      model: model
+                    }))
                   }
                 } catch (e) {
                   console.error('Error parsing SSE message:', e)
@@ -1269,14 +1378,7 @@ ${feedback}
                   <Select value={model} onValueChange={setModel}>
                     <SelectTrigger className="w-[200px] h-12 sm:h-16 text-base sm:text-lg bg-white border-orange-200 text-orange-600 rounded-xl sm:rounded-2xl">
                       <Zap className="w-5 h-5 sm:w-6 sm:h-6 mr-2" />
-                      <SelectValue>
-                        {model === "deepseek-v3" && "DeepSeek V3"}
-                        {model === "gemini-1206" && "Gemini 1206"}
-                        {model === "gemini-2.0-flash-exp" && "Gemini 2.0 Flash"}
-                        {model === "gpt4o" && "GPT-4o"}
-                        {model === "claude" && "Claude 3.5"}
-                        {model === "grok" && "Grok"}
-                      </SelectValue>
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="deepseek-v3">DeepSeek V3</SelectItem>
